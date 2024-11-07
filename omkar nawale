@@ -1,0 +1,59 @@
+#include <mpi.h>
+#include <stdio.h>
+#include <math.h>
+
+int is_prime(int n) {
+    if (n <= 1) return 0;
+    if (n <= 3) return 1;
+    if (n % 2 == 0 || n % 3 == 0) return 0;
+    for (int i = 5; i * i <= n; i += 6) {
+        if (n % i == 0 || n % (i + 2) == 0) return 0;
+    }
+    return 1;
+}
+
+int main(int argc, char** argv) {
+    int rank, size, n;
+
+    // Initialize MPI
+    MPI_Init(&argc, &argv);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+
+    // Input number to check if prime
+    if (rank == 0) {
+        printf("Enter a number to check if prime: ");
+        scanf("%d", &n);
+    }
+
+    // Broadcast the number to all processes
+    MPI_Bcast(&n, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
+    // Each process checks a portion of possible factors
+    int start = 2 + rank;
+    int is_prime_flag = 1;
+
+    for (int i = start; i <= sqrt(n); i += size) {
+        if (n % i == 0) {
+            is_prime_flag = 0;
+            break;
+        }
+    }
+
+    // Gather results from all processes
+    int global_prime_flag;
+    MPI_Reduce(&is_prime_flag, &global_prime_flag, 1, MPI_INT, MPI_LAND, 0, MPI_COMM_WORLD);
+
+    // Final result output by rank 0
+    if (rank == 0) {
+        if (global_prime_flag && n > 1) {
+            printf("%d is a prime number.\n", n);
+        } else {
+            printf("%d is not a prime number.\n", n);
+        }
+    }
+
+    // Finalize MPI
+    MPI_Finalize();
+    return 0;
+}
